@@ -4,6 +4,7 @@ require('dotenv').config();
 const express = require('express');
 const router = express.Router();
 // router.use(express.json())
+const secret = 'MaDpesset';
 
 const USERS = [
   {
@@ -17,16 +18,43 @@ const INFORMATION = []; //{email, info}
 const REFRESHTOKENS = [];
 
 router.post('/register', async (req, res, next) => {
-  const { email, user, password } = req.body;
-  USERS.forEach((user) => {
-    if (user.email === email) {
-      res.status(409).send('user already exists');
-      return;
+  try {
+    const { email, user, password } = req.body;
+    USERS.forEach((user) => {
+      if (user.email === email) {
+        res.status(409).send('user already exists');
+        throw 'user already exists';
+      }
+    });
+    const hashedPassword = await bcrypt.hash(password, 10);
+    USERS.push({ email, user, password: hashedPassword });
+    console.log(USERS);
+    res.status(201).send('Register Success');
+  } catch (error) {
+    res.status(500).send();
+  }
+});
+
+router.post('/login', async (req, res) => {
+  const { email, password } = req.body;
+  const user = USERS.find((user) => user.email === email);
+  if (!user) {
+    res.status(404).send('cannot find use');
+  }
+  try {
+    if (await bcrypt.compare(password, user.password)) {
+      const accessToken = jwt.sign({ name: user.name }, secret);
+      res.json({
+        accessToken,
+        refreshToken: 'printer',
+        email: user.email,
+        name: user.name,
+        isAdmin: user.isAdmin ? true : false,
+      });
+    } else {
+      res.status(403).send('User or Password incorrect');
     }
-  });
-  const hashedPassword = await bcrypt.hash(password, 10);
-  USERS.push({ email, user, hashedPassword });
-  res.status(201).send('Register Success');
+  } catch (error) {}
 });
 
 module.exports = router;
